@@ -20,7 +20,7 @@ before_script:
 script:
   - gulp build --target=lib --mode=opt
   - gulp test --target=spac
-  - gulp test --target=tests --browser=chrome
+  - if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then gulp test --target=tests --browser=firefox --browser=chrome; fi
   - gulp build --target=tests
 
 notifications:

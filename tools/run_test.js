@@ -21,6 +21,7 @@ var firefoxMod = /** @type {{Profile: !Function, Options: !Function}} */ (
 var safariMod;
 var ieMod = /** @type {{Options: !Function}} */ (
     require('selenium-webdriver/ie'));
+var remoteMod = require('selenium-webdriver/remote');
 
 var fork = /** @type {!Function} */ (require('child_process').fork);
 var glob = /** @type {{sync: !Function}} */ (require('glob'));
@@ -156,32 +157,66 @@ function getTestUrls(testFolder, testPrefix) {
 
 
 /**
+ * TODO(arthurhsu): IE and Safari will timeout when called. Need investigation.
+ * @param {string} browser
+ * @return {!WebDriver}
+ */
+function getRemoteWebDriver(browser) {
+  var builder = /** @type {!WebDriverBuilder} */ (new webdriver.Builder());
+  builder.usingServer('http://' +
+      process.env['SAUCE_USERNAME'] + ':' + process.env['SAUCE_ACCESS_KEY'] +
+      '@ondemand.saucelabs.com:80/wd/hub');
+
+  var caps = {
+    name: 'Travis Job ' + process.env['TRAVIS_JOB_NUMBER'] || 'pilot',
+    username: process.env['SAUCE_USERNAME'],
+    accessKey: process.env['SAUCE_ACCESS_KEY']
+  };
+  switch (browser) {
+    case 'chrome':
+      caps['browserName'] = 'chrome';
+      caps['platform'] = 'linux';
+      break;
+
+    case 'firefox':
+      caps['browserName'] = 'firefox';
+      caps['platform'] = 'linux';
+      break;
+
+    case 'safari':
+      caps['browserName'] = 'safari';
+      caps['platform'] = 'OS X 10.10';
+      break;
+
+    case 'ie':
+      caps['browserName'] = 'internet explorer';
+      caps['platform'] = 'Windows 7';
+      caps['version'] = '11.0';
+      break;
+
+    default:
+      throw new Error('Unsupported browser');
+      break;
+  }
+
+  return builder.withCapabilities(caps).build();
+}
+
+
+/**
  * @param {string} browser
  * @return {!WebDriver}
  */
 function getWebDriver(browser) {
+  if (process.env['SAUCE_USERNAME']) {
+    return getRemoteWebDriver(browser);
+  }
+
   var capabilities = /** @type {!WebDriverCapabilities} */ (
       new webdriver.Capabilities());
   capabilities.set('browserName', browser);
 
-  var usingServer = false;
-
-  // Add Sauce credentials if they were set in the environment.
-  if (process.env['SAUCE_USERNAME']) {
-    usingServer = true;
-    capabilities.set('name', 'Travis Job ' + process.env['TRAVIS_JOB_NUMBER']);
-    capabilities.set('username', process.env['SAUCE_USERNAME']);
-    capabilities.set('accessKey', process.env['SAUCE_ACCESS_KEY']);
-    capabilities.set('tunnel-identifier', process.env['TRAVIS_JOB_NUMBER']);
-  }
-
   var builder = /** @type {!WebDriverBuilder} */ (new webdriver.Builder());
-  if (usingServer) {
-    builder.usingServer('http://' +
-        process.env['SAUCE_USERNAME'] + ':' + process.env['SAUCE_ACCESS_KEY'] +
-        '@ondemand.saucelabs.com:80/wd/hub');
-  }
-
   if (browser == 'chrome') {
     var chromeOptions = /** @type {!ChromeOptions} */ (
         new chromeMod.Options());
